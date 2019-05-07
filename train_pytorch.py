@@ -68,24 +68,34 @@ def my_generator(batch_size, img_dir):
         counter += batch_size
 
 
-class model(nn.module):
+class catz_model(nn.module):
     
     def __init__(self):
         super(model, self).__init__()
-        self.conv1 = nn.Conv2d(32,32, (3,3))
- #       self.pool1 =
+                
+        self.layer1 = nn.Sequential(
+            nn.Conv2d(5*3, 32, kernel_size=3, stride=1, padding=2),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2))
         
-    def forward():
+        self.layer2 = nn.Sequential(
+            nn.Conv2d(5*3, 32, kernel_size=3, stride=1, padding=2),
+            nn.ReLU(),
+            nn.UpsamplingBilinear2d(kernel_size=2, stride=2))
+        
+    def forward(self, x):
+        out = self.layer1(1)
+        out = self.layer2(out)
+        return out
         
         
-        
-model = Sequential()
-model.add(Conv2D(32, (3, 3), activation='relu', padding='same',
-                 input_shape=(config.height, config.width, 5 * 3)))
-model.add(MaxPooling2D(2, 2))
-model.add(Conv2D(32, (3, 3), activation='relu', padding='same'))
-model.add(UpSampling2D((2, 2)))
-model.add(Conv2D(3, (3, 3), activation='relu', padding='same'))
+#model = Sequential()
+#model.add(Conv2D(32, (3, 3), activation='relu', padding='same',
+#                 input_shape=(config.height, config.width, 5 * 3)))
+#model.add(MaxPooling2D(2, 2))
+#model.add(Conv2D(32, (3, 3), activation='relu', padding='same'))
+#model.add(UpSampling2D((2, 2)))
+#model.add(Conv2D(3, (3, 3), activation='relu', padding='same'))
 
 
 def perceptual_distance(y_true, y_pred):
@@ -106,3 +116,8 @@ model.fit_generator(my_generator(config.batch_size, train_dir),
     ImageCallback(), WandbCallback()],
     validation_steps=len(glob.glob(val_dir + "/*")) // config.batch_size,
     validation_data=my_generator(config.batch_size, val_dir))
+
+
+
+# Refereces
+# https://stackoverflow.com/questions/51885408/expected-parameters-of-conv2d
