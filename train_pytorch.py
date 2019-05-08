@@ -71,7 +71,7 @@ def my_generator(batch_size, img_dir):
 class catz_model(nn.module):
     
     def __init__(self):
-        super(model, self).__init__()
+        super(catz_model, self).__init__()
                 
         self.layer1 = nn.Sequential(
             nn.Conv2d(5*3, 32, kernel_size=3, stride=1, padding=2),
@@ -87,7 +87,14 @@ class catz_model(nn.module):
         out = self.layer1(1)
         out = self.layer2(out)
         return out
-        
+
+def perceptual_distance(y_true, y_pred):
+    rmean = (y_true[:, :, :, 0] + y_pred[:, :, :, 0]) / 2
+    r = y_true[:, :, :, 0] - y_pred[:, :, :, 0]
+    g = y_true[:, :, :, 1] - y_pred[:, :, :, 1]
+    b = y_true[:, :, :, 2] - y_pred[:, :, :, 2]
+
+    return K.mean(K.sqrt((((512+rmean)*r*r)/256) + 4*g*g + (((767-rmean)*b*b)/256)))      
         
 #model = Sequential()
 #model.add(Conv2D(32, (3, 3), activation='relu', padding='same',
@@ -98,16 +105,14 @@ class catz_model(nn.module):
 #model.add(Conv2D(3, (3, 3), activation='relu', padding='same'))
 
 
-def perceptual_distance(y_true, y_pred):
-    rmean = (y_true[:, :, :, 0] + y_pred[:, :, :, 0]) / 2
-    r = y_true[:, :, :, 0] - y_pred[:, :, :, 0]
-    g = y_true[:, :, :, 1] - y_pred[:, :, :, 1]
-    b = y_true[:, :, :, 2] - y_pred[:, :, :, 2]
-
-    return K.mean(K.sqrt((((512+rmean)*r*r)/256) + 4*g*g + (((767-rmean)*b*b)/256)))
 
 
-model.compile(optimizer='adam', loss='mse', metrics=[perceptual_distance])
+
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+model = catz_model()
+optimizer = torch.optim.Adam(model.params())
+
+#model.compile(optimizer='adam', loss='mse', metrics=[perceptual_distance])
 
 model.fit_generator(my_generator(config.batch_size, train_dir),
                     steps_per_epoch=len(
