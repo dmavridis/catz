@@ -18,7 +18,7 @@ run = wandb.init(project='catz')
 ###############   Config variables definition #################################
 config = run.config
 
-config.num_epochs = 5
+config.num_epochs = 4
 config.batch_size = 32
 config.img_dir = "images"
 config.height = 96
@@ -74,8 +74,8 @@ def my_generator_augment(batch_size, img_dir):
     cat_dirs = glob.glob(img_dir + "/*")
     counter = 0
     n_batches = 512
-    n = 5
-    n_x, n_y, n_xy, n_b = np.random.choice(n, n-1, replace=False)
+    n = 6
+    n_x, n_y, n_xy, n_b, n_r = np.random.choice(n, n-1, replace=False)
 
 
     while True:
@@ -90,6 +90,7 @@ def my_generator_augment(batch_size, img_dir):
         for i in range(batch_size):
             input_imgs = glob.glob(cat_dirs[counter + i] + "/cat_[0-5]*")
             imgs = [Image.open(img) for img in sorted(input_imgs)]
+    
             input_images[i] = np.stack(imgs)
             output_images[i] = np.array(Image.open(
                 cat_dirs[counter + i] + "/cat_result.jpg"))
@@ -101,6 +102,8 @@ def my_generator_augment(batch_size, img_dir):
             input_images, output_images = flipxy(input_images, output_images)   
         elif counter % n == n_b:
             input_images, output_images = addbias(input_images, output_images)             
+#        elif counter % n == n_r:
+        input_images, output_images = addnoise(input_images, output_images)   
 
         yield (input_images, output_images)
         counter += batch_size
@@ -120,6 +123,9 @@ def addbias(input_images, output_images):
     bias = np.random.randint(-25, 25)
     return np.clip(input_images + bias, 0, 255), np.clip(output_images + bias, 0, 255)
 
+def addnoise(input_images, output_images):
+    noise = np.random.randint(-25, 25, size=(5, config.height, config.width, 3))
+    return np.clip(input_images + noise, 0, 255), output_images
 
 def perceptual_distance(y_true, y_pred):
     rmean = (y_true[:, :, :, 0] + y_pred[:, :, :, 0]) / 2
@@ -130,8 +136,6 @@ def perceptual_distance(y_true, y_pred):
     return K.mean(K.sqrt((((512+rmean)*r*r)/256) + 4*g*g + (((767-rmean)*b*b)/256)))
 
 
-
-
 ##################  Model definition  #########################################
     
 def catz_model():
@@ -139,16 +143,18 @@ def catz_model():
     model.add(ConvLSTM2D(filters = 32, 
                          kernel_size = 3,
                          activation='relu',
-                         use_bias = False,
+                         use_bias = True,
+                         bias_initializer = 'zeros',
+                         unit_forget_bias = True,
                          recurrent_activation='hard_sigmoid',
+#                         recurrent_regularizer = 'L1L2',
                          padding='same',
                          data_format='channels_last',
                          input_shape = ( 5,  config.height, config.width, 3),
                          return_sequences=False,
                          kernel_initializer='random_uniform',
+#                         recurrent_dropout=0.2,
                         ))
-
-
     model.add(Conv2D(3, (3, 3), activation='relu', padding='same'))
     
     return model
@@ -157,8 +163,8 @@ def catz_model():
 
 model = catz_model()
 
-model.compile(optimizer='adam', loss='mse', metrics=[perceptual_distance])
-model.fit_generator(my_generator_augment(config.batch_size, train_dir),
+model.compile(optimizer='adam', loss='mae', metrics=[perceptual_distance])
+model.fit_generator(my_generator(config.batch_size, train_dir),
                     steps_per_epoch=512,
 #                    steps_per_epoch=len(
 #                        glob.glob(train_dir + "/*")) // config.batch_size,
@@ -166,6 +172,9 @@ model.fit_generator(my_generator_augment(config.batch_size, train_dir),
     ImageCallback(), WandbCallback()],
     validation_steps=len(glob.glob(val_dir + "/*")) // config.batch_size,
     validation_data=my_generator(config.batch_size, val_dir))
+
+
+
 
 
 # https://machinelearningmastery.com/cnn-long-short-term-memory-networks/
