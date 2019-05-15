@@ -1,6 +1,7 @@
 #############  Imports   ######################################################
 
-from keras.layers import Conv2D, UpSampling2D, MaxPooling2D, Input, ConvLSTM2D, BatchNormalization
+from keras.layers import Conv2D, UpSampling2D, MaxPooling2D, Input, \
+                        ConvLSTM2D, BatchNormalization, MaxPooling3D
 from keras.models import Sequential
 from keras.callbacks import Callback
 import random
@@ -18,7 +19,7 @@ run = wandb.init(project='catz')
 ###############   Config variables definition #################################
 config = run.config
 
-config.num_epochs = 4
+config.num_epochs = 8
 config.batch_size = 32
 config.img_dir = "images"
 config.height = 96
@@ -68,15 +69,13 @@ def my_generator(batch_size, img_dir):
         counter += batch_size
 
 
-
 def my_generator_augment(batch_size, img_dir):
     """A generator that returns 5 images plus a result image"""
     cat_dirs = glob.glob(img_dir + "/*")
     counter = 0
-    n_batches = 512
+    n_batches = 1000
     n = 6
     n_x, n_y, n_xy, n_b, n_r = np.random.choice(n, n-1, replace=False)
-
 
     while True:
         if counter == n_batches:
@@ -102,8 +101,8 @@ def my_generator_augment(batch_size, img_dir):
             input_images, output_images = flipxy(input_images, output_images)   
         elif counter % n == n_b:
             input_images, output_images = addbias(input_images, output_images)             
-#        elif counter % n == n_r:
-        input_images, output_images = addnoise(input_images, output_images)   
+        elif counter % n == n_r:
+            input_images, output_images = addnoise(input_images, output_images)   
 
         yield (input_images, output_images)
         counter += batch_size
@@ -124,7 +123,7 @@ def addbias(input_images, output_images):
     return np.clip(input_images + bias, 0, 255), np.clip(output_images + bias, 0, 255)
 
 def addnoise(input_images, output_images):
-    noise = np.random.randint(-25, 25, size=(5, config.height, config.width, 3))
+    noise = np.random.randint(-15, 15, size=(5, config.height, config.width, 3))
     return np.clip(input_images + noise, 0, 255), output_images
 
 def perceptual_distance(y_true, y_pred):
@@ -154,9 +153,8 @@ def catz_model():
                          return_sequences=False,
                          kernel_initializer='random_uniform',
 #                         recurrent_dropout=0.2,
-                        ))
+                        ))  
     model.add(Conv2D(3, (3, 3), activation='relu', padding='same'))
-    
     return model
 
 ##################  Model training  ###########################################
